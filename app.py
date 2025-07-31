@@ -12,7 +12,7 @@ def model_to_dict_instance(instance):
     return model_to_dict(instance, recurse=True)
 
 
-# ------------------ CUSTOMER ROUTES ------------------
+#CUSTOMER ROUTES --------
 
 @app.route('/customers', methods=['POST'])
 def create_customer():
@@ -62,7 +62,7 @@ def delete_customer(id):
         abort(404)
 
 
-# ------------------ INVOICE ROUTES ------------------
+# INVOICE ROUTES ------------------
 
 @app.route('/invoices', methods=['POST'])
 def create_invoice():
@@ -115,7 +115,7 @@ def delete_invoice(id):
         abort(404)
 
 
-# ------------------ ITEM ROUTES ------------------
+# ITEM ROUTES ------------------
 
 @app.route('/items', methods=['POST'])
 def create_item():
@@ -170,6 +170,11 @@ def delete_item(id):
         return jsonify({'message': 'Item deleted'})
     except Item.DoesNotExist:
         abort(404)
+
+
+
+# Implement Authentication------------
+
 
 
 if __name__ == '__main__':
