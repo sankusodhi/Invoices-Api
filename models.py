@@ -1,6 +1,7 @@
 from peewee import *
+from datetime import datetime
 
-db = SqliteDatabase('database.db')
+db = SqliteDatabase('invoices.db')
 
 
 class BaseModel(Model):
@@ -10,16 +11,16 @@ class BaseModel(Model):
 
 class Customer(BaseModel):
     name = CharField()
-    email = CharField(unique=True)
+    email = CharField()
 
 
 class Invoice(BaseModel):
     customer = ForeignKeyField(Customer, backref='invoices')
-    date = DateField()
+    date = DateTimeField(default=datetime.now)
 
 
 class Item(BaseModel):
     invoice = ForeignKeyField(Invoice, backref='items')
-    description = CharField()
-    quantity = IntegerField()
+    name = CharField()
+    description = TextField()
     price = FloatField()
