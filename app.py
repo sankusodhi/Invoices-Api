@@ -1,181 +1,177 @@
-from flask import Flask, request, jsonify, abort
-from models import db, Customer, Invoice, Item
+from flask import Flask, request, jsonify, send_file, abort
+from peewee import SqliteDatabase, Model, CharField, ForeignKeyField, FloatField
 from playhouse.shortcuts import model_to_dict
+from functools import wraps
+from weasyprint import HTML
 from datetime import datetime
+import os
 
+# SETUP ----------------------
 app = Flask(__name__)
+db = SqliteDatabase('invoicing.db')
+
+# MODELS ----------------------
+class BaseModel(Model):
+    class Meta:
+        database = db
+
+class Customer(BaseModel):
+    name = CharField()
+    email = CharField()
+
+class Invoice(BaseModel):
+    customer = ForeignKeyField(Customer, backref='invoices')
+    date = CharField(default=lambda: datetime.now().strftime('%Y-%m-%d'))
+
+class Item(BaseModel):
+    invoice = ForeignKeyField(Invoice, backref='items')
+    description = CharField()
+    price = FloatField()
+
 db.connect()
 db.create_tables([Customer, Invoice, Item])
 
+# AUTH DECORATOR ----------------------
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get("Authorization")
+        if not token or token != "Bearer your-secret-token":
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
 
-def model_to_dict_instance(instance):
-    return model_to_dict(instance, recurse=True)
+#  ROUTES ----------------------
 
-
-#CUSTOMER ROUTES --------
+@app.route('/auth-check', methods=['GET'])
+@require_auth
+def auth_check():
+    return jsonify({"message": "Token is valid"})
 
 @app.route('/customers', methods=['POST'])
+@require_auth
 def create_customer():
     data = request.get_json()
-    try:
-        customer = Customer.create(name=data['name'], email=data['email'])
-        return jsonify({'id': customer.id, 'name': customer.name, 'email': customer.email}), 201
-    except:
-        return jsonify({'error': 'Customer already exists or invalid data'}), 400
-
+    if not data or 'name' not in data or 'email' not in data:
+        return jsonify({'error': 'Missing name or email'}), 400
+    customer = Customer.create(name=data['name'], email=data['email'])
+    return jsonify(model_to_dict(customer))
 
 @app.route('/customers', methods=['GET'])
-def list_customers():
-    customers = list(Customer.select().dicts())
+@require_auth
+def get_customers():
+    customers = [model_to_dict(cust) for cust in Customer.select()]
     return jsonify(customers)
 
-
-@app.route('/customers/<int:id>', methods=['GET'])
-def get_customer(id):
-    try:
-        customer = Customer.get_by_id(id)
-        return jsonify(model_to_dict(customer))
-    except Customer.DoesNotExist:
-        abort(404)
-
-
-@app.route('/customers/<int:id>', methods=['PUT'])
-def update_customer(id):
-    data = request.get_json()
-    try:
-        customer = Customer.get_by_id(id)
-        customer.name = data.get('name', customer.name)
-        customer.email = data.get('email', customer.email)
-        customer.save()
-        return jsonify(model_to_dict(customer))
-    except Customer.DoesNotExist:
-        abort(404)
-
-
-@app.route('/customers/<int:id>', methods=['DELETE'])
-def delete_customer(id):
-    try:
-        customer = Customer.get_by_id(id)
-        customer.delete_instance(recursive=True)
-        return jsonify({'message': 'Customer deleted'})
-    except Customer.DoesNotExist:
-        abort(404)
-
-
-# INVOICE ROUTES ------------------
-
 @app.route('/invoices', methods=['POST'])
+@require_auth
 def create_invoice():
     data = request.get_json()
-    try:
-        customer = Customer.get_by_id(data['customer_id'])
-        invoice = Invoice.create(customer=customer, date=data.get('date', datetime.now().date()))
-        return jsonify(model_to_dict(invoice)), 201
-    except Customer.DoesNotExist:
-        return jsonify({'error': 'Invalid customer ID'}), 400
+    if 'customer_id' not in data or 'items' not in data:
+        return jsonify({'error': 'Missing customer_id or items'}), 400
+    customer = Customer.get_or_none(Customer.id == data['customer_id'])
+    if not customer:
+        return jsonify({'error': 'Customer not found'}), 404
+    invoice = Invoice.create(customer=customer)
+    for item_data in data['items']:
+        Item.create(invoice=invoice, description=item_data['description'], price=item_data['price'])
+    return jsonify(model_to_dict(invoice, recurse=True))
 
+@app.route('/invoices/<int:invoice_id>', methods=['GET'])
+@require_auth
+def get_invoice(invoice_id):
+    invoice = Invoice.get_or_none(Invoice.id == invoice_id)
+    if invoice:
+        return jsonify(model_to_dict(invoice, recurse=True))
+    return jsonify({"error": "Invoice not found"}), 404
 
 @app.route('/invoices', methods=['GET'])
-def list_invoices():
-    invoices = [model_to_dict(inv) for inv in Invoice.select()]
+@require_auth
+def get_invoices():
+    invoices = [model_to_dict(inv, recurse=True) for inv in Invoice.select()]
     return jsonify(invoices)
 
-
-@app.route('/invoices/<int:id>', methods=['GET'])
-def get_invoice(id):
-    try:
-        invoice = Invoice.get_by_id(id)
-        return jsonify(model_to_dict(invoice, recurse=True))
-    except Invoice.DoesNotExist:
-        abort(404)
-
-
-@app.route('/invoices/<int:id>', methods=['PUT'])
-def update_invoice(id):
+@app.route('/invoices/<int:invoice_id>', methods=['PUT'])
+@require_auth
+def update_invoice(invoice_id):
     data = request.get_json()
-    try:
-        invoice = Invoice.get_by_id(id)
-        if 'customer_id' in data:
-            invoice.customer = Customer.get_by_id(data['customer_id'])
-        if 'date' in data:
-            invoice.date = data['date']
-        invoice.save()
-        return jsonify(model_to_dict(invoice))
-    except:
-        abort(400)
+    invoice = Invoice.get_or_none(Invoice.id == invoice_id)
+    if not invoice:
+        return jsonify({"error": "Invoice not found"}), 404
+    if 'customer_id' in data:
+        customer = Customer.get_or_none(Customer.id == data['customer_id'])
+        if not customer:
+            return jsonify({'error': 'Customer not found'}), 404
+        invoice.customer = customer
+    invoice.save()
+    return jsonify(model_to_dict(invoice))
 
+@app.route('/invoices/<int:invoice_id>', methods=['DELETE'])
+@require_auth
+def delete_invoice(invoice_id):
+    invoice = Invoice.get_or_none(Invoice.id == invoice_id)
+    if not invoice:
+        return jsonify({"error": "Invoice not found"}), 404
+    invoice.delete_instance(recursive=True)
+    return jsonify({"message": "Invoice deleted"})
 
-@app.route('/invoices/<int:id>', methods=['DELETE'])
-def delete_invoice(id):
-    try:
-        invoice = Invoice.get_by_id(id)
-        invoice.delete_instance(recursive=True)
-        return jsonify({'message': 'Invoice deleted'})
-    except Invoice.DoesNotExist:
-        abort(404)
+# PDF GENERATION ----------------------
 
+@app.route('/invoices/<int:invoice_id>/pdf', methods=['GET'])
+@require_auth
+def generate_pdf(invoice_id):
+    invoice = Invoice.get_or_none(Invoice.id == invoice_id)
+    if not invoice:
+        return jsonify({"error": "Invoice not found"}), 404
 
-# ITEM ROUTES ------------------
+    customer = invoice.customer
+    items = Item.select().where(Item.invoice == invoice)
 
-@app.route('/items', methods=['POST'])
-def create_item():
-    data = request.get_json()
-    try:
-        invoice = Invoice.get_by_id(data['invoice_id'])
-        item = Item.create(
-            invoice=invoice,
-            description=data['description'],
-            quantity=data['quantity'],
-            price=data['price']
-        )
-        return jsonify(model_to_dict(item)), 201
-    except:
-        return jsonify({'error': 'Invalid invoice ID or data'}), 400
+    html_content = f"""
+    <html>
+    <head>
+        <title>Invoice #{invoice.id}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            table {{ width: 100%; border-collapse: collapse; }}
+            th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+        </style>
+    </head>
+    <body>
+        <h1>Invoice #{invoice.id}</h1>
+        <p><strong>Date:</strong> {invoice.date}</p>
+        <p><strong>Customer:</strong> {customer.name} ({customer.email})</p>
+        <h2>Items</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
 
+    total = 0
+    for item in items:
+        html_content += f"<tr><td>{item.description}</td><td>${item.price:.2f}</td></tr>"
+        total += item.price
 
-@app.route('/items', methods=['GET'])
-def list_items():
-    items = [model_to_dict(i) for i in Item.select()]
-    return jsonify(items)
+    html_content += f"""
+            </tbody>
+        </table>
+        <h3>Total: ${total:.2f}</h3>
+    </body>
+    </html>
+    """
 
+    filename = f"invoice_{invoice.id}.pdf"
+    HTML(string=html_content).write_pdf(filename)
 
-@app.route('/items/<int:id>', methods=['GET'])
-def get_item(id):
-    try:
-        item = Item.get_by_id(id)
-        return jsonify(model_to_dict(item))
-    except Item.DoesNotExist:
-        abort(404)
+    return send_file(filename, as_attachment=True)
 
-
-@app.route('/items/<int:id>', methods=['PUT'])
-def update_item(id):
-    data = request.get_json()
-    try:
-        item = Item.get_by_id(id)
-        item.description = data.get('description', item.description)
-        item.quantity = data.get('quantity', item.quantity)
-        item.price = data.get('price', item.price)
-        item.save()
-        return jsonify(model_to_dict(item))
-    except:
-        abort(400)
-
-
-@app.route('/items/<int:id>', methods=['DELETE'])
-def delete_item(id):
-    try:
-        item = Item.get_by_id(id)
-        item.delete_instance()
-        return jsonify({'message': 'Item deleted'})
-    except Item.DoesNotExist:
-        abort(404)
-
-
-
-# Implement Authentication------------
-
-
-
-if __name__ == '__main__':
+# RUN APP ----------------------
+if __name__ == "__main__":
     app.run(debug=True)
+
