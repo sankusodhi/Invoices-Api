@@ -6,11 +6,11 @@ from weasyprint import HTML
 from datetime import datetime
 import os
 
-# SETUP ----------------------
+# ---------------------- SETUP ----------------------
 app = Flask(__name__)
 db = SqliteDatabase('invoicing.db')
 
-# MODELS ----------------------
+# ---------------------- MODELS ----------------------
 class BaseModel(Model):
     class Meta:
         database = db
@@ -31,7 +31,7 @@ class Item(BaseModel):
 db.connect()
 db.create_tables([Customer, Invoice, Item])
 
-# AUTH DECORATOR ----------------------
+# ---------------------- AUTH DECORATOR ----------------------
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -41,7 +41,7 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-#  ROUTES ----------------------
+# ---------------------- ROUTES ----------------------
 
 @app.route('/auth-check', methods=['GET'])
 @require_auth
@@ -67,14 +67,24 @@ def get_customers():
 @require_auth
 def create_invoice():
     data = request.get_json()
-    if 'customer_id' not in data or 'items' not in data:
-        return jsonify({'error': 'Missing customer_id or items'}), 400
-    customer = Customer.get_or_none(Customer.id == data['customer_id'])
+    if 'customer' not in data or 'items' not in data:
+        return jsonify({'error': 'Missing customer or items'}), 400
+
+    customer = Customer.get_or_none(Customer.id == data['customer'])
     if not customer:
         return jsonify({'error': 'Customer not found'}), 404
+
     invoice = Invoice.create(customer=customer)
+
     for item_data in data['items']:
-        Item.create(invoice=invoice, description=item_data['description'], price=item_data['price'])
+        if 'description' not in item_data or 'price' not in item_data:
+            return jsonify({'error': 'Each item must have description and price'}), 400
+        Item.create(
+            invoice=invoice,
+            description=item_data['description'],
+            price=item_data['price']
+        )
+
     return jsonify(model_to_dict(invoice, recurse=True))
 
 @app.route('/invoices/<int:invoice_id>', methods=['GET'])
@@ -98,8 +108,8 @@ def update_invoice(invoice_id):
     invoice = Invoice.get_or_none(Invoice.id == invoice_id)
     if not invoice:
         return jsonify({"error": "Invoice not found"}), 404
-    if 'customer_id' in data:
-        customer = Customer.get_or_none(Customer.id == data['customer_id'])
+    if 'customer' in data:
+        customer = Customer.get_or_none(Customer.id == data['customer'])
         if not customer:
             return jsonify({'error': 'Customer not found'}), 404
         invoice.customer = customer
@@ -115,7 +125,7 @@ def delete_invoice(invoice_id):
     invoice.delete_instance(recursive=True)
     return jsonify({"message": "Invoice deleted"})
 
-# PDF GENERATION ----------------------
+# ---------------------- PDF GENERATION ----------------------
 
 @app.route('/invoices/<int:invoice_id>/pdf', methods=['GET'])
 @require_auth
@@ -171,7 +181,6 @@ def generate_pdf(invoice_id):
 
     return send_file(filename, as_attachment=True)
 
-# RUN APP ----------------------
+# ---------------------- RUN APP ----------------------
 if __name__ == "__main__":
     app.run(debug=True)
-
