@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, abort
+from flask import Flask, request, jsonify, send_file, abort, render_template, redirect, url_for
 from peewee import SqliteDatabase, Model, CharField, ForeignKeyField, FloatField
 from playhouse.shortcuts import model_to_dict
 from functools import wraps
@@ -23,6 +23,11 @@ class Invoice(BaseModel):
     customer = ForeignKeyField(Customer, backref='invoices')
     date = CharField(default=lambda: datetime.now().strftime('%Y-%m-%d'))
 
+    @property
+    def total(self):
+        return sum(item.price for item in self.items)
+
+
 class Item(BaseModel):
     invoice = ForeignKeyField(Invoice, backref='items')
     description = CharField()
@@ -41,14 +46,14 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-# ---------------------- ROUTES ----------------------
+# ---------------------- API ROUTES ----------------------
 
-@app.route('/auth-check', methods=['GET'])
+@app.route('/api/auth-check', methods=['GET'])
 @require_auth
 def auth_check():
     return jsonify({"message": "Token is valid"})
 
-@app.route('/customers', methods=['POST'])
+@app.route('/api/customers', methods=['POST'])
 @require_auth
 def create_customer():
     data = request.get_json()
@@ -57,13 +62,13 @@ def create_customer():
     customer = Customer.create(name=data['name'], email=data['email'])
     return jsonify(model_to_dict(customer))
 
-@app.route('/customers', methods=['GET'])
+@app.route('/api/customers', methods=['GET'])
 @require_auth
 def get_customers():
     customers = [model_to_dict(cust) for cust in Customer.select()]
     return jsonify(customers)
 
-@app.route('/invoices', methods=['POST'])
+@app.route('/api/invoices', methods=['POST'])
 @require_auth
 def create_invoice():
     data = request.get_json()
@@ -87,7 +92,7 @@ def create_invoice():
 
     return jsonify(model_to_dict(invoice, recurse=True))
 
-@app.route('/invoices/<int:invoice_id>', methods=['GET'])
+@app.route('/api/invoices/<int:invoice_id>', methods=['GET'])
 @require_auth
 def get_invoice(invoice_id):
     invoice = Invoice.get_or_none(Invoice.id == invoice_id)
@@ -95,13 +100,13 @@ def get_invoice(invoice_id):
         return jsonify(model_to_dict(invoice, recurse=True))
     return jsonify({"error": "Invoice not found"}), 404
 
-@app.route('/invoices', methods=['GET'])
+@app.route('/api/invoices', methods=['GET'])
 @require_auth
 def get_invoices():
     invoices = [model_to_dict(inv, recurse=True) for inv in Invoice.select()]
     return jsonify(invoices)
 
-@app.route('/invoices/<int:invoice_id>', methods=['PUT'])
+@app.route('/api/invoices/<int:invoice_id>', methods=['PUT'])
 @require_auth
 def update_invoice(invoice_id):
     data = request.get_json()
@@ -116,7 +121,7 @@ def update_invoice(invoice_id):
     invoice.save()
     return jsonify(model_to_dict(invoice))
 
-@app.route('/invoices/<int:invoice_id>', methods=['DELETE'])
+@app.route('/api/invoices/<int:invoice_id>', methods=['DELETE'])
 @require_auth
 def delete_invoice(invoice_id):
     invoice = Invoice.get_or_none(Invoice.id == invoice_id)
@@ -125,61 +130,95 @@ def delete_invoice(invoice_id):
     invoice.delete_instance(recursive=True)
     return jsonify({"message": "Invoice deleted"})
 
-# ---------------------- PDF GENERATION ----------------------
+# ---------------------- FRONTEND ROUTES ----------------------
 
-@app.route('/invoices/<int:invoice_id>/pdf', methods=['GET'])
-@require_auth
-def generate_pdf(invoice_id):
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/customers')
+def customers_page():
+    customers = Customer.select()
+    return render_template('customers.html', customers=customers)
+
+@app.route('/invoices')
+def invoices_page():
+    invoices = Invoice.select().join(Customer)
+    return render_template('invoices.html', invoices=invoices)
+
+@app.route('/invoices/new', methods=['GET', 'POST'])
+def new_invoice_page():
+    customers = Customer.select()
+    if request.method == 'POST':
+        customer_id = request.form['customer_id']
+        descriptions = request.form.getlist('description[]')
+        prices = request.form.getlist('price[]')
+
+        invoice = Invoice.create(customer=customer_id)
+        for desc, price in zip(descriptions, prices):
+            Item.create(invoice=invoice, description=desc, price=float(price))
+
+        return redirect(url_for('invoices_page'))
+
+    return render_template('new_invoice.html', customers=customers)
+
+# ---------------------- PDF DOWNLOAD ROUTE ----------------------
+
+@app.route('/invoices/<int:invoice_id>/pdf')
+def download_invoice_pdf(invoice_id):
     invoice = Invoice.get_or_none(Invoice.id == invoice_id)
     if not invoice:
-        return jsonify({"error": "Invoice not found"}), 404
+        return "Invoice not found", 404
 
-    customer = invoice.customer
-    items = Item.select().where(Item.invoice == invoice)
+    try:
+        total = invoice.total
+        rendered = render_template('invoice_template.html', invoice=invoice, total=total)
+        pdf_file_path = f'temp_invoice_{invoice_id}.pdf'
+        HTML(string=rendered).write_pdf(pdf_file_path)
+        return send_file(pdf_file_path, as_attachment=True, download_name=f'invoice_{invoice_id}.pdf')
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return "Internal Server Error", 500
 
-    html_content = f"""
-    <html>
-    <head>
-        <title>Invoice #{invoice.id}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; }}
-            table {{ width: 100%; border-collapse: collapse; }}
-            th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
-            th {{ background-color: #f2f2f2; }}
-        </style>
-    </head>
-    <body>
-        <h1>Invoice #{invoice.id}</h1>
-        <p><strong>Date:</strong> {invoice.date}</p>
-        <p><strong>Customer:</strong> {customer.name} ({customer.email})</p>
-        <h2>Items</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th>Price</th>
-                </tr>
-            </thead>
-            <tbody>
-    """
 
-    total = 0
-    for item in items:
-        html_content += f"<tr><td>{item.description}</td><td>${item.price:.2f}</td></tr>"
-        total += item.price
+# --------------------- Customer Edit Route ----------------------
 
-    html_content += f"""
-            </tbody>
-        </table>
-        <h3>Total: ${total:.2f}</h3>
-    </body>
-    </html>
-    """
+@app.route('/customers/<int:customer_id>/edit', methods=['GET', 'POST'])
+def edit_customer(customer_id):
+    customer = Customer.get_or_none(Customer.id == customer_id)
+    if not customer:
+        return "Customer not found", 404
 
-    filename = f"invoice_{invoice.id}.pdf"
-    HTML(string=html_content).write_pdf(filename)
+    if request.method == 'POST':
+        customer.name = request.form['name']
+        customer.email = request.form['email']
+        customer.save()
+        return redirect(url_for('customers_page'))
 
-    return send_file(filename, as_attachment=True)
+    return render_template('edit_customer.html', customer=customer)
+
+
+# --------------------- Invoice Edit Route ----------------------
+
+@app.route('/invoices/<int:invoice_id>/edit', methods=['GET', 'POST'])
+def edit_invoice(invoice_id):
+    invoice = Invoice.get_or_none(Invoice.id == invoice_id)
+    if not invoice:
+        return "Invoice not found", 404
+
+    customers = Customer.select()
+
+    if request.method == 'POST':
+        customer_id = request.form.get('customer_id')
+        customer = Customer.get_or_none(Customer.id == customer_id)
+        if customer:
+            invoice.customer = customer
+            invoice.save()
+            return redirect(url_for('invoices_page'))
+
+    return render_template('edit_invoice.html', invoice=invoice, customers=customers)
+
+
 
 # ---------------------- RUN APP ----------------------
 if __name__ == "__main__":

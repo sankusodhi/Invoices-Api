@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="text-xl font-bold mb-4">Invoices</h1>
+
+<ul class="bg-white rounded shadow p-4">
+  {% for invoice in invoices %}
+    <li class="py-4 border-b">
+      <div>
+        <strong>Invoice #{{ invoice.id }}</strong> ({{ invoice.date }}) —
+        {{ invoice.customer.name }}
+        <a href="/invoices/{{ invoice.id }}/pdf" class="text-blue-500 underline ml-2" target="_blank">Download PDF</a>
+        <button onclick="window.print()" class="ml-4 text-sm bg-gray-200 px-2 py-1 rounded hover:bg-gray-300">Print</button>
+        <form method="POST" action="{{ url_for('delete_invoice', invoice_id=invoice.id) }}">
+    <button type="submit" onclick="return confirm('Delete this invoice?')">Delete</button>
+    <button type="submit"  formaction="{{ url_for('edit_invoice', invoice_id=invoice.id) }}" onclick="return confirm('Update this invoice?')">Update</button>
+</form>
+
+      </div>
+
+      {% if invoice.items %}
+        <ul class="ml-4 mt-2 text-sm text-gray-700">
+          {% for item in invoice.items %}
+            <li>- {{ item.description }}: ₹{{ "%.2f"|format(item.price) }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}
+
+
+
+
