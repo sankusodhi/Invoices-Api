@@ -1,0 +1,10 @@
+<h2>Edit Customer</h2>
+<form method="POST">
+    <label>Name:</label>
+    <input type="text" name="name" value="{{ customer.name }}" required><br>
+    <label>Email:</label>
+    <input type="email" name="email" value="{{ customer.email }}" required><br>
+    <button type="submit">Update</button>
+</form>
+<p><a href="/customers">Back to Customers</a></p>
+{% if error %}

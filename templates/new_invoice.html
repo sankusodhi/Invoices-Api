@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">Create Invoice</h1>
+<form method="POST" action="/invoices/new" id="invoice-form" class="space-y-4 bg-white p-6 rounded shadow">
+  <label class="block">Customer:
+    <select name="customer_id" class="mt-1 p-2 w-full border rounded">
+      {% for cust in customers %}
+        <option value="{{ cust.id }}">{{ cust.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <div id="items">
+    <div class="item flex gap-2">
+      <input type="text" name="description[]" placeholder="Item description" class="border p-2 flex-1">
+      <input type="number" name="price[]" placeholder="Price" step="0.01" class="border p-2 w-32">
+    </div>
+  </div>
+
+  <button type="button" onclick="addItem()" class="bg-gray-200 px-4 py-2 rounded">+ Add Item</button>
+  <br />
+  <button class="bg-blue-600 text-white px-6 py-2 rounded mt-4">Create Invoice</button>
+</form>
+
+<script>
+function addItem() {
+  const container = document.getElementById('items');
+  const div = document.createElement('div');
+  div.className = 'item flex gap-2 mt-2';
+  div.innerHTML = `
+    <input type="text" name="description[]" placeholder="Item description" class="border p-2 flex-1">
+    <input type="number" name="price[]" placeholder="Price" step="0.01" class="border p-2 w-32">
+  `;
+  container.appendChild(div);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">Customers</h1>
+<ul class="bg-white rounded shadow p-4">
+  {% for cust in customers %}
+    <li class="py-2 border-b">{{ cust.name }} — {{ cust.email }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}

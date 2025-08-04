@@ -45,8 +45,8 @@
 </header>
 
 <section class="invoice-details">
-    <div><strong>Customer Name:</strong> {{ customer.name }}</div>
-    <div><strong>Email:</strong> {{ customer.email }}</div>
+    <div><strong>Customer Name:</strong> {{ invoice.customer.name }}</div>
+    <div><strong>Email:</strong> {{ invoice.customer.email }}</div>
     <div><strong>Invoice ID:</strong> {{ invoice.id }}</div>
     <div><strong>Date:</strong> {{ invoice.date }}</div>
 </section>
@@ -64,14 +64,14 @@
         <tr>
             <td>{{ item.name }}</td>
             <td>{{ item.description }}</td>
-            <td>{{ item.price }}</td>
+            <td>₹{{ "%.2f"|format(item.price) }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 
 <div class="total">
-    Total: ₹{{ total }}
+    Total: ₹{{ "%.2f"|format(total) }}
 </div>
 
 </body>

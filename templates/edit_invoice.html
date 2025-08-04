@@ -1,0 +1,10 @@
+<form action="{{ url_for('edit_invoice', invoice_id=invoice.id) }}" method="POST">
+    <select name="customer_id">
+        {% for customer in customers %}
+            <option value="{{ customer.id }}" {% if customer.id == invoice.customer.id %}selected{% endif %}>
+                {{ customer.name }}
+            </option>
+        {% endfor %}
+    </select>
+    <button type="submit">Update</button>
+</form>
