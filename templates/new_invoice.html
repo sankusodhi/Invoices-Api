@@ -1,37 +1,66 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<h1 class="text-xl font-bold mb-4">Create Invoice</h1>
-<form method="POST" action="/invoices/new" id="invoice-form" class="space-y-4 bg-white p-6 rounded shadow">
-  <label class="block">Customer:
-    <select name="customer_id" class="mt-1 p-2 w-full border rounded">
-      {% for cust in customers %}
-        <option value="{{ cust.id }}">{{ cust.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
+<div class="max-w-lg mx-auto bg-white rounded-lg shadow p-6 mt-8">
+    <h1 class="text-2xl font-bold mb-4">Create New Invoice</h1>
+    <form method="POST" class="space-y-4">
+        <!-- Customer Name Input -->
+        <div>
+            <label class="block text-gray-700 font-semibold">Customer Name</label>
+            <input type="text" name="customer_name" required class="w-full border rounded px-3 py-2 focus:ring focus:border-blue-400">
+        </div>
 
-  <div id="items">
-    <div class="item flex gap-2">
-      <input type="text" name="description[]" placeholder="Item description" class="border p-2 flex-1">
-      <input type="number" name="price[]" placeholder="Price" step="0.01" class="border p-2 w-32">
-    </div>
-  </div>
+        <!-- Amount Input -->
+        <div>
+            <label class="block text-gray-700 font-semibold">Amount</label>
+            <input type="number" step="0.01" name="amount" required class="w-full border rounded px-3 py-2 focus:ring focus:border-blue-400">
+        </div>
 
-  <button type="button" onclick="addItem()" class="bg-gray-200 px-4 py-2 rounded">+ Add Item</button>
-  <br />
-  <button class="bg-blue-600 text-white px-6 py-2 rounded mt-4">Create Invoice</button>
-</form>
+        <div id="items-container">
+            <div class="mb-2 flex gap-2">
+                <input type="text" name="description[]" placeholder="Item Description" required
+                       class="flex-1 border rounded px-3 py-2 focus:ring focus:border-blue-400">
+                <input type="number" name="price[]" step="0.01" placeholder="Price" required
+                       class="w-24 border rounded px-3 py-2 focus:ring focus:border-blue-400">
+                <button type="button" class="remove-item-btn bg-red-500 text-white px-2 rounded">X</button>
+            </div>
+        </div>
+
+        <!-- Add Item Button -->
+        <div class="mt-4">
+            <button type="button" id="add-item-btn" class="bg-blue-500 hover:bg-blue-600 text-blue px-4 py-2 rounded w-full">
+                Add Item
+            </button>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="mt-4">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-blue px-4 py-2 rounded w-full">
+                Save Invoice
+            </button>
+        </div>
+    </form>
+</div>
 
 <script>
-function addItem() {
-  const container = document.getElementById('items');
-  const div = document.createElement('div');
-  div.className = 'item flex gap-2 mt-2';
-  div.innerHTML = `
-    <input type="text" name="description[]" placeholder="Item description" class="border p-2 flex-1">
-    <input type="number" name="price[]" placeholder="Price" step="0.01" class="border p-2 w-32">
-  `;
-  container.appendChild(div);
-}
+    // Add Item Button Click Event
+    document.getElementById('add-item-btn').addEventListener('click', () => {
+        const container = document.getElementById('items-container');
+        const newItem = document.createElement('div');
+        newItem.className = 'mb-2 flex gap-2';
+        newItem.innerHTML = `
+            <input type="text" name="description[]" placeholder="Item Description" required
+                   class="flex-1 border rounded px-3 py-2 focus:ring focus:border-blue-400">
+            <input type="number" name="price[]" step="0.01" placeholder="Price" required
+                   class="w-24 border rounded px-3 py-2 focus:ring focus:border-blue-400">
+            <button type="button" class="remove-item-btn bg-red-500 text-white px-2 rounded">X</button>
+        `;
+        container.appendChild(newItem);
+
+        // Add event listener to remove button for each added item
+        newItem.querySelector('.remove-item-btn').addEventListener('click', e => {
+            e.target.parentElement.remove();
+        });
+    });
 </script>
 {% endblock %}

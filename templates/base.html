@@ -1,15 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Invoicing App</title>
-  <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Invoice Portal{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800">
-  <div class="max-w-4xl mx-auto p-4">
-    <h1 class="text-3xl font-bold mb-4">🧾 Invoicing System</h1>
-    {% block content %}{% endblock %}
-  </div>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-700 text-white px-6 py-3 shadow">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-lg font-bold">Invoice Portal</h1>
+            <div class="flex gap-4">
+                <a href="/" class="hover:text-gray-200">Home</a>
+                <a href="/customers" class="hover:text-gray-200">Customers</a>
+                <a href="/invoices" class="hover:text-gray-200">Invoices</a>
+                <a href="/invoices/new" class="hover:text-gray-200">Create Invoice</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main class="flex-1 container mx-auto px-6 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white text-center py-4 mt-auto">
+        <p class="text-sm">&copy; 2025 Invoice Portal. All rights reserved.</p>
+    </footer>
+
 </body>
 </html>
