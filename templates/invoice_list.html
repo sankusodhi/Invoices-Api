@@ -1,0 +1,17 @@
+<form method="POST" action="/invoices/{{ invoice.id }}/submit" style="display:inline;">
+    <button type="submit">Submit to Govt Portal</button>
+</form>
+{% for invoice in invoices %}
+    <tr>
+        <td>{{ invoice.id }}</td>
+        <td>{{ invoice.customer.name }}</td>
+        <td>{{ invoice.amount }}</td>
+        <td>{{ invoice.created_at }}</td>
+        <td>
+            <!-- Submit Button -->
+            <form method="POST" action="/invoices/{{ invoice.id }}/submit" style="display:inline;">
+                <button type="submit">Submit to Govt Portal</button>
+            </form>
+        </td>
+    </tr>
+{% endfor %}

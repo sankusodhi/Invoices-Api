@@ -1,9 +1,18 @@
 {% extends "layout.html" %}
 {% block content %}
 <h1 class="text-xl font-bold mb-4">Customers</h1>
+
+<a href="{{ url_for('new_customer') }}" 
+   class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow">
+   + Add Customer
+</a>
+
+
 <ul class="bg-white rounded shadow p-4">
   {% for cust in customers %}
     <li class="py-2 border-b">{{ cust.name }} — {{ cust.email }}</li>
+  {% else %}
+    <li class="py-2">No customers found.</li>
   {% endfor %}
 </ul>
 {% endblock %}

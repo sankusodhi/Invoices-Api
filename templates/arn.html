@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Generate ARN{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded shadow w-1/2 mx-auto">
+  <h1 class="text-2xl font-bold mb-4">Generate ARN</h1>
+
+  <form method="POST" action="/arn" class="space-y-4">
+    <div>
+      <label class="block mb-1">User Name</label>
+      <input type="text" name="user_name" class="border rounded w-full px-2 py-1" required>
+    </div>
+
+    <div>
+      <label class="block mb-1">Invoice Number</label>
+      <input type="text" name="invoice_number" class="border rounded w-full px-2 py-1" required>
+    </div>
+
+    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+      Generate ARN
+    </button>
+  </form>
+
+  {% if arn %}
+    <p class="mt-4 text-green-600 font-semibold">✅ Generated ARN: {{ arn }}</p>
+  {% endif %}
+
+  {% if error %}
+    <p class="mt-4 text-red-600 font-semibold">⚠️ Error: {{ error }}</p>
+  {% endif %}
+</div>
+{% endblock %}
